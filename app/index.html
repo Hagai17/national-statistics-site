@@ -1,35 +1,32 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The Archipelago Ledger — Indonesia's National Statistics</title>
-<meta name="description" content="Indonesia's official statistics — population, economy, living standards and provinces — every figure with its source and year.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='16' fill='%23b3352b'/%3E%3Crect y='16' width='32' height='16' fill='%23f7f3ea'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css">
-<script type="module" src="main.js"></script>
+<title>The Archipelago Ledger — Indonesia in Numbers</title>
+<meta name="description" content="Indonesia's national statistics, every figure sourced: population, economy, provinces, and daily life. Sources: BPS, World Bank, UN.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./style.css">
 </head>
 <body>
-<header class="site-head">
-  <a class="brand" href="#/">
-    <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-    <span class="brand-text">The Archipelago Ledger<small>Indonesia's national statistics</small></span>
-  </a>
-  <nav aria-label="Sections">
-    <a href="#/">Overview</a>
-    <a href="#/people">People</a>
-    <a href="#/economy">Economy</a>
-    <a href="#/living">Living standards</a>
-    <a href="#/provinces">Provinces</a>
-    <a href="#/sources">Sources</a>
+<header class="masthead">
+  <p class="dateline">Jakarta &middot; Updated 26 November 2026 &middot; All figures sourced</p>
+  <h1>The Archipelago Ledger</h1>
+  <p class="tagline">Indonesia in numbers &mdash; population, economy, provinces and daily life, counted by BPS, the World Bank and the United Nations.</p>
+  <nav class="pagenav" aria-label="Sections">
+    <a href="#/" data-page="overview">Overview</a>
+    <a href="#/people" data-page="people">People</a>
+    <a href="#/economy" data-page="economy">Economy</a>
+    <a href="#/provinces" data-page="provinces">Provinces</a>
+    <a href="#/living" data-page="living">Living</a>
+    <a href="#/sources" data-page="sources">Sources</a>
   </nav>
 </header>
-<main id="app"></main>
-<footer class="site-foot">
-  <p><strong>The Archipelago Ledger</strong> — an original, independent presentation of official
-  statistics. Figures are published by BPS (Statistics Indonesia), the World Bank and the
-  United Nations, and are named beside every number.</p>
-  <p>Not affiliated with BPS or any government body. This site runs entirely from its own files.</p>
+<main id="page" aria-live="polite"></main>
+<footer class="colophon">
+  <p>The Archipelago Ledger is an independent reading of public statistics. Figures come from Statistics Indonesia (BPS), the World Bank and the United Nations; each page names its source and year. Figures are rounded as published. This site works offline: every file it needs ships with it.</p>
+  <p class="colophon-note">Built for the make.fun best national statistics site bounty, November 2026.</p>
 </footer>
+<script type="module" src="./main.js"></script>
 </body>
 </html>

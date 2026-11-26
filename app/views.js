@@ -1,237 +1,246 @@
-// views.js — the pages of The Archipelago Ledger. One job: turn the figures
-// in data.js into HTML for each route. The router in main.js picks a view;
-// charts come from charts.js. Every figure is printed with its source and
-// year next to it — that is the site's promise.
+// views.js — one render function per page of the Ledger.
+//
+// Each page is a string of HTML built from the figures in data.js, so the
+// numbers a visitor reads are always the numbers data.js holds. Two pages
+// carry a working control: Provinces can sort its table, Economy can switch
+// its chart between growth and inflation. The controls keep their state in
+// this module and re-render the page when pressed.
 
 import {
   COUNTRY, HEADLINES, CENSUS, CENSUS_SOURCE, PEOPLE_FACTS, TOP_PROVINCES,
-  PROVINCE_SOURCE, GDP_GROWTH, GDP_GROWTH_SOURCE, SECTORS, SECTOR_SOURCE,
+  PROVINCE_SOURCE, GROWTH, GROWTH_SOURCE, SECTORS, SECTOR_SOURCE,
   INFLATION, INFLATION_SOURCE, ARRIVALS, ARRIVALS_SOURCE, POVERTY,
-  POVERTY_SOURCE, LIVING_FACTS, ECONOMY_FACTS,
+  POVERTY_SOURCE, LIVING_FACTS, ECONOMY_FACTS, SOURCE_NOTES,
 } from './data.js';
-import { barChart, lineChart, donutChart, donutLegend } from './charts.js';
+import { lineChart, barChart, censusChart } from './charts.js';
 
-const fmt = (n) => n.toLocaleString('en-US');
-const millions = (n) => (n / 1e6).toFixed(1);
+let provinceSort = 'pop';
+let economySeries = 'growth';
 
-function statCards(facts) {
-  return `<div class="stat-grid">${facts
-    .map((f) => `<div class="stat"><span class="stat-value">${f.value}</span>${f.unit ? `<span class="stat-unit">${f.unit}</span>` : ''}<span class="stat-label">${f.label}</span><span class="stat-source">${f.source}${f.year ? `, ${f.year}` : ''}</span></div>`)
-    .join('')}</div>`;
+export function setProvinceSort(mode) { provinceSort = mode; }
+export function setEconomySeries(mode) { economySeries = mode; }
+
+function whole(n) {
+  return Number(n).toLocaleString('en-US');
 }
 
-function factList(facts) {
-  return `<dl class="fact-list">${facts
-    .map((f) => `<div><dt>${f.label}</dt><dd><strong>${f.value}</strong>${f.unit ? ` <span>${f.unit}</span>` : ''}<br><small>${f.source}</small></dd></div>`)
-    .join('')}</dl>`;
+function millions(n) {
+  return `${(n / 1000000).toFixed(1)}m`;
 }
 
-// A chart with a working Chart/Table toggle: the same numbers, two ways.
-function chartCard(title, source, chartSvg, tableHtml) {
-  return `<section class="card">
-    <div class="card-head"><h2>${title}</h2>
-    <div class="toggle" role="group" aria-label="View as chart or table">
-      <button type="button" class="toggle-btn is-on" data-view="chart">Chart</button>
-      <button type="button" class="toggle-btn" data-view="table">Table</button>
-    </div></div>
-    <div class="chart-wrap">${chartSvg}</div>
-    <div class="table-wrap" hidden>${tableHtml}</div>
-    <p class="source-line">Source: ${source}</p>
-  </section>`;
+function head(title, lede) {
+  return `<div class="page-head"><h2>${title}</h2><p class="lede">${lede}</p></div>`;
 }
 
-function simpleTable(headers, rows) {
-  return `<table class="data-table"><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows
-    .map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`)
-    .join('')}</tbody></table>`;
+function sourceLine(text) {
+  return `<p class="chart-source">Source: ${text}</p>`;
 }
 
-export function overviewView() {
-  const censusChart = barChart(
-    CENSUS.map((c) => ({ label: String(c.year), value: c.people / 1e6, display: millions(c.people), highlight: !!c.estimate })),
-    { aria: 'Population of Indonesia by census year, in millions' },
-  );
-  const censusTable = simpleTable(
-    ['Count', 'People'],
-    CENSUS.map((c) => [`${c.year}${c.estimate ? ' (estimate)' : ' census'}`, fmt(c.people)]),
-  );
+function statCards() {
+  return `<div class="cards">${HEADLINES.map((c) => `
+    <article class="stat-card">
+      <div class="label">${c.label}</div>
+      <div class="value">${c.value}</div>
+      <p class="detail">${c.detail}</p>
+      <p class="source">${c.source}</p>
+    </article>`).join('')}
+  </div>`;
+}
+
+function factGrid(facts) {
+  return `<div class="fact-grid">${facts.map((f) => `
+    <div class="fact">
+      <div class="label">${f.label}</div>
+      <div class="value">${f.value}</div>
+      ${f.detail ? `<div class="label">${f.detail}</div>` : ''}
+      <div class="source">${f.source}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ---- Overview: the six headline cards, the population story, and a map of
+// the rest of the Ledger so a first-time visitor knows where to look.
+function renderOverview() {
   return `
-  <section class="hero">
-    <p class="kicker">National statistics of ${COUNTRY.name}</p>
-    <h1>A country of 284 million people,<br>told in its own numbers.</h1>
-    <p class="lede">The Archipelago Ledger gathers the official figures for the world's fourth most
-    populous country — ${COUNTRY.islands} islands, ${COUNTRY.provinces} provinces, one capital at
-    ${COUNTRY.capital} — and prints every number with the source and year it came from.</p>
+  ${head('Indonesia in numbers', 'The world’s fourth most populous country, the largest economy in Southeast Asia, and an archipelago of more than 17,000 islands — counted, sourced, and kept in one ledger.')}
+  ${statCards()}
+  <section class="section">
+    <h3>How the population grew</h3>
+    <p class="section-note">Every census since 1971, plus the latest projection. Indonesia passed 200 million people around the turn of the century and 280 million in the mid-2020s.</p>
+    <div class="chart-box">
+      <p class="chart-title">Population at each census, millions of people</p>
+      ${censusChart(CENSUS)}
+      ${sourceLine(CENSUS_SOURCE)}
+    </div>
   </section>
-  ${statCards(HEADLINES)}
-  ${chartCard('Population at each census, millions', CENSUS_SOURCE, censusChart, censusTable)}
-  <section class="card">
-    <h2>Indonesia in the world</h2>
-    ${factList([
-      { label: 'Share of world population', value: '3.5%', source: 'UN World Population Prospects, 2025' },
-      { label: 'World rank by GDP', value: '16th', source: 'World Bank, 2024' },
-      { label: 'In Southeast Asia', value: 'Largest economy, most people', source: 'World Bank, 2024' },
-      { label: 'Domestic tourist trips', value: '1.02 billion a year', source: 'BPS, 2024' },
-    ])}
-  </section>
-  <section class="card">
-    <h2>Explore the country</h2>
-    <div class="link-grid">
-      <a class="link-card" href="#/people"><strong>People</strong><span>Who Indonesians are: age, cities, provinces and how the population grew.</span></a>
-      <a class="link-card" href="#/economy"><strong>Economy</strong><span>Growth, sectors, prices and the visitors who come to see the country.</span></a>
-      <a class="link-card" href="#/living"><strong>Living standards</strong><span>Poverty, work and inequality — the figures that describe daily life.</span></a>
-      <a class="link-card" href="#/provinces"><strong>Provinces</strong><span>The ten most populous provinces, searchable and sortable.</span></a>
+  <section class="section two-col">
+    <div class="callout">
+      <h4>Indonesia at a glance</h4>
+      <p><strong>${COUNTRY.provinces} provinces</strong> across ${COUNTRY.islands} islands, from Aceh in the west to Papua in the east. The capital is ${COUNTRY.capital}; the land area is ${COUNTRY.landArea}.</p>
+      <p>More than half the population — 55.7% — lives on Java, an island smaller than Great Britain. That one fact shapes almost every other number in this ledger.</p>
+    </div>
+    <div class="callout">
+      <h4>Where to look next</h4>
+      <p><a href="#/people">People</a> — who lives here, and where.</p>
+      <p><a href="#/economy">Economy</a> — growth, industries, prices and visitors.</p>
+      <p><a href="#/provinces">Provinces</a> — the ten largest, ranked.</p>
+      <p><a href="#/living">Living</a> — poverty, work and the cost of life.</p>
     </div>
   </section>`;
 }
 
-export function peopleView() {
-  const censusChart = barChart(
-    CENSUS.map((c) => ({ label: String(c.year), value: c.people / 1e6, display: millions(c.people), highlight: !!c.estimate })),
-    { aria: 'Population of Indonesia by census year, in millions' },
-  );
-  const censusTable = simpleTable(
-    ['Count', 'People'],
-    CENSUS.map((c) => [`${c.year}${c.estimate ? ' (estimate)' : ' census'}`, fmt(c.people)]),
-  );
-  const provChart = barChart(
-    TOP_PROVINCES.slice(0, 6).map((p) => ({ label: p.name, value: p.people / 1e6, display: millions(p.people) })),
-    { aria: 'Six most populous provinces, in millions', color: '#14635d' },
-  );
-  const provTable = simpleTable(
-    ['Province', 'People (2020)', 'Capital'],
-    TOP_PROVINCES.map((p) => [p.name, fmt(p.people), p.capital]),
-  );
+// ---- People: the facts of who lives here, and where they concentrate.
+function renderPeople() {
+  const top5 = TOP_PROVINCES.slice(0, 5).map((p) => ({
+    name: p.name, value: p.people, label: millions(p.people),
+  }));
   return `
-  <section class="page-head">
-    <p class="kicker">People</p>
-    <h1>Who lives in Indonesia</h1>
-    <p class="lede">The population has more than doubled since 1971. Growth is slowing — about
-    1.1% a year in 2025 (BPS) — and the country is urbanising: nearly six in ten Indonesians
-    now live in towns and cities.</p>
-  </section>
-  ${chartCard('Population at each census, millions', CENSUS_SOURCE, censusChart, censusTable)}
-  <section class="card"><h2>The shape of the population</h2>${factList(PEOPLE_FACTS)}</section>
-  ${chartCard('The six largest provinces, millions (2020)', PROVINCE_SOURCE, provChart, provTable)}
-  <p class="note">Three Javanese provinces — West, East and Central Java — hold 125.5 million
-  people between them, 46% of the country (BPS, 2020 Census). The full provincial table is on
-  the <a href="#/provinces">Provinces page</a>.</p>`;
-}
-
-export function economyView() {
-  const growthChart = lineChart(
-    GDP_GROWTH.map((g) => ({ label: String(g.year), value: g.pct, display: `${g.pct.toFixed(2)}%` })),
-    { aria: 'GDP growth by year, percent' },
-  );
-  const growthTable = simpleTable(['Year', 'GDP growth'], GDP_GROWTH.map((g) => [g.year, `${g.pct.toFixed(2)}%`]));
-  const inflationChart = lineChart(
-    INFLATION.map((g) => ({ label: String(g.year), value: g.pct, display: `${g.pct.toFixed(2)}%` })),
-    { aria: 'Inflation each December, percent', color: '#14635d' },
-  );
-  const inflationTable = simpleTable(['December', 'Inflation (year on year)'], INFLATION.map((g) => [g.year, `${g.pct.toFixed(2)}%`]));
-  const arrivalsChart = barChart(
-    ARRIVALS.map((a) => ({ label: String(a.year), value: a.m, display: a.m.toFixed(2), highlight: !!a.provisional })),
-    { aria: 'International visitor arrivals by year, in millions', color: '#d9903f' },
-  );
-  const arrivalsTable = simpleTable(['Year', 'Arrivals'], ARRIVALS.map((a) => [a.year, `${a.m.toFixed(2)} million${a.provisional ? ' (provisional)' : ''}`]));
-  return `
-  <section class="page-head">
-    <p class="kicker">Economy</p>
-    <h1>Southeast Asia's largest economy</h1>
-    <p class="lede">Indonesia's GDP reached Rp 23,821 trillion in 2025 (BPS) — about US$1.40
-    trillion in 2024 (World Bank). Growth has held near 5% a year since the pandemic rebound,
-    and prices have calmed after the 2022 spike.</p>
-  </section>
-  ${statCards(ECONOMY_FACTS.map((f) => ({ ...f, year: '' })))}
-  ${chartCard('GDP growth, percent year on year', GDP_GROWTH_SOURCE, growthChart, growthTable)}
-  <section class="card">
-    <h2>What the economy makes</h2>
-    <div class="donut-row">${donutChart(SECTORS, { aria: 'Shares of GDP by sector' })}${donutLegend(SECTORS)}</div>
-    <p class="source-line">Source: ${SECTOR_SOURCE}</p>
-  </section>
-  ${chartCard('Inflation, December year on year', INFLATION_SOURCE, inflationChart, inflationTable)}
-  ${chartCard('International visitors, millions a year', ARRIVALS_SOURCE, arrivalsChart, arrivalsTable)}`;
-}
-
-export function livingView() {
-  const povertyChart = lineChart(
-    POVERTY.map((p) => ({ label: String(p.year), value: p.pct, display: `${p.pct.toFixed(2)}%` })),
-    { aria: 'Poverty rate each March, percent', color: '#14635d' },
-  );
-  const povertyTable = simpleTable(['March', 'Poverty rate'], POVERTY.map((p) => [p.year, `${p.pct.toFixed(2)}%`]));
-  return `
-  <section class="page-head">
-    <p class="kicker">Living standards</p>
-    <h1>How life is changing</h1>
-    <p class="lede">Poverty fell to 8.07% in March 2026 — the lowest in the series — after rising
-    during the pandemic. Work is plentiful but often informal: three in five workers are in
-    informal jobs (BPS, February 2025).</p>
-  </section>
-  ${chartCard('Poverty rate, percent of the population each March', POVERTY_SOURCE, povertyChart, povertyTable)}
-  <section class="card"><h2>Work and welfare in figures</h2>${factList(LIVING_FACTS)}</section>
-  <p class="note">The poverty line is drawn by BPS from the cost of a basic basket of food and
-  non-food needs: Rp 609,160 per person per month in March 2025. Urban poverty (6.73% in March
-  2025) runs well below rural poverty (11.03%) — both BPS, Susenas.</p>`;
-}
-
-export function provincesView() {
-  const rows = TOP_PROVINCES.map(
-    (p, i) => `<tr data-name="${p.name.toLowerCase()}"><td>${i + 1}</td><td><strong>${p.name}</strong></td><td>${fmt(p.people)}</td><td>${millions(p.people)} M</td><td>${p.capital}</td></tr>`,
-  ).join('');
-  return `
-  <section class="page-head">
-    <p class="kicker">Provinces</p>
-    <h1>The ten most populous provinces</h1>
-    <p class="lede">Indonesia has ${COUNTRY.provinces} provinces. These ten, from the 2020
-    census, hold 196.3 million people — almost three quarters of the country. Search the list
-    or sort it with the controls below; both work on this page, offline.</p>
-  </section>
-  <section class="card">
-    <div class="controls">
-      <label>Search <input type="search" id="province-search" placeholder="Type a province name…" autocomplete="off"></label>
-      <label>Sort by
-        <select id="province-sort">
-          <option value="rank">Population rank</option>
-          <option value="name">Name, A–Z</option>
-          <option value="people-desc">People, most first</option>
-          <option value="people-asc">People, fewest first</option>
-        </select>
-      </label>
+  ${head('People', '284.4 million people, a median age of just over 30, and a population still growing — but more slowly than a generation ago.')}
+  ${factGrid(PEOPLE_FACTS)}
+  <section class="section">
+    <h3>Where the people are</h3>
+    <p class="section-note">Java holds the crowd. The five most populous provinces are all on Java except North Sumatra — and West Java alone holds more people than most countries.</p>
+    <div class="chart-box">
+      <p class="chart-title">Five largest provinces, 2020 census</p>
+      ${barChart(top5)}
+      ${sourceLine(PROVINCE_SOURCE)}
     </div>
-    <table class="data-table" id="province-table">
-      <thead><tr><th>#</th><th>Province</th><th>People (2020)</th><th>Millions</th><th>Capital</th></tr></thead>
-      <tbody>${rows}</tbody>
+  </section>
+  <section class="section">
+    <h3>A young country, ageing slowly</h3>
+    <p class="section-note">A median age of 30.4 years and 68.9% of people of working age give Indonesia a demographic dividend: more workers than dependants. Fertility at 2.1 children per woman — replacement level — means that dividend will narrow in the decades ahead. The full provincial ranking is on the <a href="#/provinces">Provinces</a> page.</p>
+  </section>`;
+}
+
+// ---- Economy: growth and prices on one switchable chart, industries as
+// bars, visitors as a recovery story.
+function renderEconomy() {
+  const series = economySeries === 'growth'
+    ? { points: GROWTH.map((g) => ({ x: String(g.year), y: g.pct })), source: GROWTH_SOURCE, title: 'Real GDP growth, % year on year', zero: true }
+    : { points: INFLATION.map((g) => ({ x: String(g.year), y: g.pct })), source: INFLATION_SOURCE, title: 'Consumer price inflation, December year on year, %', zero: false };
+  return `
+  ${head('Economy', 'Southeast Asia’s largest economy grew 5.11% in 2025 — close to the 5.31% rebound peak of 2022 — while inflation stayed inside 2%.')}
+  <section class="section">
+    <h3>Growth and prices</h3>
+    <p class="section-note">Switch the chart to see the two series side by side in your head: growth dipped below zero only in the pandemic year, 2020; inflation spiked once, in 2022, and fell back fast.</p>
+    <div class="controls" role="group" aria-label="Choose the chart series">
+      <button type="button" data-action="economy-series" data-value="growth" aria-pressed="${economySeries === 'growth'}">GDP growth</button>
+      <button type="button" data-action="economy-series" data-value="inflation" aria-pressed="${economySeries === 'inflation'}">Inflation</button>
+    </div>
+    <div class="chart-box">
+      <p class="chart-title">${series.title}</p>
+      ${lineChart(series.points, { unit: '%', decimals: 2, zeroLine: series.zero })}
+      ${sourceLine(series.source)}
+    </div>
+  </section>
+  <section class="section">
+    <h3>What the economy makes</h3>
+    <p class="section-note">Manufacturing is the single largest industry at 19% of GDP; trade and farming each add about 13%.</p>
+    <div class="chart-box">
+      <p class="chart-title">Share of GDP by industry, 2024</p>
+      ${barChart(SECTORS.map((s) => ({ name: s.name, value: s.pct, label: `${s.pct}%` })), { accent: '#b97f16' })}
+      ${sourceLine(SECTOR_SOURCE)}
+    </div>
+  </section>
+  <section class="section">
+    <h3>Visitors are back</h3>
+    <p class="section-note">International arrivals collapsed from 16.11 million in 2019 to 1.56 million in 2021, then climbed every year since — 15.39 million in 2025, within a million of the pre-pandemic peak.</p>
+    <div class="chart-box">
+      <p class="chart-title">International visitor arrivals, millions</p>
+      ${lineChart(ARRIVALS.map((a) => ({ x: String(a.year), y: a.millions })), { unit: 'm', decimals: 2 })}
+      ${sourceLine(ARRIVALS_SOURCE)}
+    </div>
+  </section>
+  ${factGrid(ECONOMY_FACTS)}`;
+}
+
+// ---- Provinces: the full top-ten table, sortable two ways.
+function renderProvinces() {
+  const rows = [...TOP_PROVINCES].sort((a, b) =>
+    provinceSort === 'name' ? a.name.localeCompare(b.name) : b.people - a.people);
+  const max = TOP_PROVINCES[0].people;
+  return `
+  ${head('Provinces', 'Indonesia has 38 provinces. These ten hold the bulk of the population — West Java alone counts 48.3 million people, more than the whole of Canada.')}
+  <section class="section">
+    <div class="controls" role="group" aria-label="Sort the province table">
+      <button type="button" data-action="province-sort" data-value="pop" aria-pressed="${provinceSort === 'pop'}">Most populous first</button>
+      <button type="button" data-action="province-sort" data-value="name" aria-pressed="${provinceSort === 'name'}">Alphabetical</button>
+    </div>
+    <table class="ledger-table">
+      <thead><tr><th>#</th><th>Province</th><th>Capital</th><th class="num">People, 2020</th><th class="bar-cell">Share of the largest</th></tr></thead>
+      <tbody>
+        ${rows.map((p, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${p.name}</strong></td>
+          <td>${p.capital}</td>
+          <td class="num">${whole(p.people)}</td>
+          <td class="bar-cell"><div class="bar-track"><div class="bar-fill" style="width:${Math.round((p.people / max) * 100)}%"></div></div></td>
+        </tr>`).join('')}
+      </tbody>
     </table>
-    <p class="source-line">Source: ${PROVINCE_SOURCE}. West Java has since passed 50 million
-    in BPS estimates for 2025 — the census table above stays the comparable count.</p>
+    ${sourceLine(PROVINCE_SOURCE)}
+    <p class="section-note">Jakarta is listed by its 2020 census count; as the Special Capital Region it is governed differently from the other provinces. The remaining 28 provinces each count fewer than 6.5 million people.</p>
   </section>`;
 }
 
-export function sourcesView() {
+// ---- Living: poverty falling, work informal, and what a month costs.
+function renderLiving() {
   return `
-  <section class="page-head">
-    <p class="kicker">Sources &amp; method</p>
-    <h1>Where every figure comes from</h1>
-    <p class="lede">The Archipelago Ledger republishes official statistics. Nothing here is
-    estimated by the site itself: each figure is printed beside its source and year, and the
-    full list is below.</p>
+  ${head('Living', 'Poverty has fallen every March since its 2021 peak, to 8.07% — the lowest in the series. Work, though, is still mostly informal.')}
+  <section class="section">
+    <h3>Poverty, year by year</h3>
+    <p class="section-note">The poverty rate is measured each March by the National Socio-Economic Survey. It peaked at 10.14% in the pandemic year 2021 and has fallen every March since.</p>
+    <div class="chart-box">
+      <p class="chart-title">Poverty rate, % of the population, each March</p>
+      ${lineChart(POVERTY.map((p) => ({ x: String(p.year), y: p.pct })), { unit: '%', decimals: 2 })}
+      ${sourceLine(POVERTY_SOURCE)}
+    </div>
   </section>
-  <section class="card">
-    <h2>Principal sources</h2>
-    <ul class="source-list">
-      <li><strong>BPS — Statistics Indonesia</strong> (bps.go.id): population censuses 1971–2020 and the mid-2025 projection; national accounts 2019–2025; consumer prices; Susenas poverty rounds to March 2026; Sakernas labour rounds to August 2026; international visitor arrivals to 2025.</li>
-      <li><strong>World Bank</strong>, World Development Indicators: GDP in US dollars and at PPP, 2024.</li>
-      <li><strong>United Nations</strong>, World Population Prospects: median age, urban share and fertility, 2025.</li>
-    </ul>
-    <h2>How to read the figures</h2>
-    <p>Figures marked <em>provisional</em> or <em>estimate</em> are the publishing agency's own
-    labels and may be revised. Census counts are complete enumerations; survey figures
-    (poverty, unemployment) come from BPS's national samples, Susenas and Sakernas. Where two
-    agencies publish the same quantity — GDP per person, for example — the site prints one and
-    names it, rather than blending them.</p>
-    <h2>About this site</h2>
-    <p>The Archipelago Ledger is an original, independent presentation of public statistics.
-    It is not affiliated with BPS or any government body. It runs entirely from its own files:
-    no account, no network, nothing to install.</p>
+  ${factGrid(LIVING_FACTS)}
+  <section class="section">
+    <h3>Reading the poverty line</h3>
+    <p class="section-note">The line — Rp 609,160 per person per month in March 2025 — is what BPS reckons a person needs for basic food and non-food needs. 22.93 million people lived below it in March 2026. At the same time 59.4% of workers were informal, without a formal contract or social protection — the number that explains why falling poverty and everyday precarity can both be true.</p>
   </section>`;
+}
+
+// ---- Sources: who counted what, and how this ledger treats the numbers.
+function renderSources() {
+  return `
+  ${head('Sources &amp; method', 'A statistics site is only as good as its sources. Here is every one the Ledger uses, what it covers, and how the numbers are handled.')}
+  <section class="section">
+    <h3>Sources</h3>
+    <ul class="source-list">
+      ${SOURCE_NOTES.map((s) => `
+      <li>
+        <div class="name">${s.name}</div>
+        <p class="covers">${s.covers}</p>
+        <div class="link">${s.link}</div>
+      </li>`).join('')}
+    </ul>
+  </section>
+  <section class="section">
+    <h3>How the Ledger works</h3>
+    <ol class="method-list">
+      <li><strong>Figures are printed as published.</strong> Rounding follows the source: BPS reports poverty to two decimals, GDP growth to two, census counts to the person.</li>
+      <li><strong>Provisional figures are labelled.</strong> The 2025 visitor arrivals and the mid-2025 population are estimates, and the page says so next to the number.</li>
+      <li><strong>Every chart carries its source.</strong> If a number has no source line, it is not on this site.</li>
+      <li><strong>Nothing is fetched live.</strong> All figures ship inside the site's own files, so the numbers you see are the numbers that were checked — they do not change between visits.</li>
+      <li><strong>Updates.</strong> The Ledger is refreshed when BPS publishes a new release; the dateline at the top of every page gives the date of the current edition.</li>
+    </ol>
+  </section>`;
+}
+
+export const PAGES = {
+  overview: renderOverview,
+  people: renderPeople,
+  economy: renderEconomy,
+  provinces: renderProvinces,
+  living: renderLiving,
+  sources: renderSources,
+};
+
+export function renderPage(route) {
+  const render = PAGES[route] ?? PAGES.overview;
+  return render();
 }
